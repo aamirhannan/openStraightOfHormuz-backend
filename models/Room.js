@@ -8,39 +8,33 @@ const roomSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
-    // The seed used to deterministically generate the grid
-    seed: {
-      type: Number,
-      required: true,
-    },
     status: {
       type: String,
-      enum: ["waiting", "playing", "finished"],
-      default: "waiting",
+      enum: ["placing_mines", "ready", "flipping", "won", "lost"],
+      default: "placing_mines",
     },
-    players: [
-      {
-        socketId: String,
-        name: { type: String, default: "Anonymous" },
-        score: { type: Number, default: 0 },
-        slot: { type: Number, enum: [1, 2] },
-      },
-    ],
-    // Track which cells have been revealed (index → player slot)
-    revealedCells: {
-      type: Map,
-      of: Number, // cell index → player slot (1 or 2)
-      default: {},
+
+    // ── Players (identified by localStorage UUID) ──
+    creator: {
+      userId: { type: String, required: true },
+      name: { type: String, default: "Mine Layer" },
     },
-    currentTurn: {
-      type: Number,
-      enum: [1, 2],
-      default: 1,
+    flipper: {
+      userId: { type: String, default: null },
+      name: { type: String, default: null },
     },
-    winner: {
-      type: Number, // 1, 2, or 0 for tie
-      default: null,
-    },
+
+    // ── Map data ──
+    waterMask: [Boolean],       // 400-length, true = water cell
+    cellValues: [Number],       // 400-length, random 0–9 for water, 0 for land
+    minePositions: [Number],    // indices where creator placed mines
+    maxMines: { type: Number, default: 0 },
+
+    // ── Flipper state ──
+    revealedCells: [Number],    // indices flipped by the flipper
+    antidotes: { type: Number, default: 5 },
+    score: { type: Number, default: 0 },
+    minesHit: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
