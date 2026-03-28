@@ -242,14 +242,60 @@ router.post("/rooms/:code/flip", async (req, res) => {
     } else {
       room.score += cellValue;
 
-      // Check win: all safe water cells revealed
-      const waterCount = room.waterMask.filter(Boolean).length;
-      const safeCells = waterCount - room.minePositions.length;
-      const safeRevealed = room.revealedCells.filter(
-        (idx) => !room.minePositions.includes(idx)
-      ).length;
+      // Check win: contiguous safe path from west edge to east edge
+      const safeRevealedSet = new Set(room.revealedCells.filter(idx => !room.minePositions.includes(idx)));
+      
+      let minWaterCol = COLS;
+      let maxWaterCol = -1;
+      for (let i = 0; i < TOTAL; i++) {
+        if (room.waterMask[i]) {
+          const c = i % COLS;
+          if (c < minWaterCol) minWaterCol = c;
+          if (c > maxWaterCol) maxWaterCol = c;
+        }
+      }
 
-      if (safeRevealed >= safeCells) {
+      const visited = new Set();
+      const queue = [];
+
+      // Start BFS only from cells strictly on the western-most playable wall
+      for (const idx of safeRevealedSet) {
+        if (idx % COLS === minWaterCol) {
+          queue.push(idx);
+          visited.add(idx);
+        }
+      }
+
+      let won = false;
+      while (queue.length > 0) {
+        const curr = queue.shift();
+        const c = curr % COLS;
+        const r = Math.floor(curr / COLS);
+
+        // Path must reach the absolute eastern-most playable wall
+        if (c === maxWaterCol) {
+          won = true;
+          break;
+        }
+
+        // Check 8-way neighbors (horizontal, vertical, diagonal contiguous cells)
+        for (const dr of [-1, 0, 1]) {
+          for (const dc of [-1, 0, 1]) {
+            if (dr === 0 && dc === 0) continue;
+            const nr = r + dr;
+            const nc = c + dc;
+            if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+              const nIdx = nr * COLS + nc;
+              if (safeRevealedSet.has(nIdx) && !visited.has(nIdx)) {
+                visited.add(nIdx);
+                queue.push(nIdx);
+              }
+            }
+          }
+        }
+      }
+
+      if (won) {
         room.status = "won";
         outcome = "won";
       }
