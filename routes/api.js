@@ -75,6 +75,28 @@ router.post("/rooms/:code/mines", async (req, res) => {
     if (invalid.length > 0) {
       return res.status(400).json({ error: "Some mines are on land" });
     }
+    
+    // Validate 8-way adjacency
+    for (const idx of minePositions) {
+      const r = Math.floor(idx / COLS);
+      const c = idx % COLS;
+      const adjacent = [];
+      for (const dr of [-1, 0, 1]) {
+        for (const dc of [-1, 0, 1]) {
+          if (dr === 0 && dc === 0) continue;
+          const nr = r + dr, nc = c + dc;
+          if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+            adjacent.push(nr * COLS + nc);
+          }
+        }
+      }
+      for (const a of adjacent) {
+        if (minePositions.includes(a)) {
+          return res.status(400).json({ error: "Mines cannot be diagonally or orthogonally adjacent" });
+        }
+      }
+    }
+
     if (minePositions.length > room.maxMines) {
       return res.status(400).json({ error: `Max ${room.maxMines} mines allowed` });
     }
@@ -111,12 +133,32 @@ router.post("/rooms/bot", async (req, res) => {
     const validPositions = [];
     waterMask.forEach((isWater, i) => { if (isWater) validPositions.push(i); });
     
-    // Shuffle and pick maxMines
+    // Shuffle and pick maxMines with spacing rules
     for (let i = validPositions.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [validPositions[i], validPositions[j]] = [validPositions[j], validPositions[i]];
     }
-    const minePositions = validPositions.slice(0, maxMines);
+    
+    const minePositions = [];
+    for (const idx of validPositions) {
+      const r = Math.floor(idx / COLS);
+      const c = idx % COLS;
+      const adjacent = [];
+      for (const dr of [-1, 0, 1]) {
+        for (const dc of [-1, 0, 1]) {
+          if (dr === 0 && dc === 0) continue;
+          const nr = r + dr, nc = c + dc;
+          if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+            adjacent.push(nr * COLS + nc);
+          }
+        }
+      }
+      // Only place mine if no orthogonally or diagonally adjacent cell is already a mine
+      if (!adjacent.some(a => minePositions.includes(a))) {
+        minePositions.push(idx);
+      }
+      if (minePositions.length >= maxMines) break;
+    }
 
     const room = await Room.create({
       roomCode,
