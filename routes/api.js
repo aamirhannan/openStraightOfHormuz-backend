@@ -93,6 +93,68 @@ router.post("/rooms/:code/mines", async (req, res) => {
   }
 });
 
+// ──────────── CREATE BOT ROOM ────────────
+router.post("/rooms/bot", async (req, res) => {
+  try {
+    const { userId, playerName, waterMask } = req.body;
+    if (!userId || !waterMask || waterMask.length !== TOTAL) {
+      return res.status(400).json({ error: "Missing userId or invalid waterMask" });
+    }
+
+    const roomCode = generateRoomCode();
+    const waterCount = waterMask.filter(Boolean).length;
+    const maxMines = Math.floor(waterCount * 0.10);
+
+    const cellValues = waterMask.map((isWater) => isWater ? Math.floor(Math.random() * 10) : 0);
+
+    // Randomize mines
+    const validPositions = [];
+    waterMask.forEach((isWater, i) => { if (isWater) validPositions.push(i); });
+    
+    // Shuffle and pick maxMines
+    for (let i = validPositions.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [validPositions[i], validPositions[j]] = [validPositions[j], validPositions[i]];
+    }
+    const minePositions = validPositions.slice(0, maxMines);
+
+    const room = await Room.create({
+      roomCode,
+      status: "flipping",
+      creator: { userId: "bot", name: "AI Commander" },
+      flipper: { userId, name: playerName || "Human" },
+      waterMask,
+      cellValues,
+      minePositions,
+      maxMines,
+      antidotes: MAX_ANTIDOTES,
+      revealedCells: [],
+      score: 0,
+      minesHit: 0
+    });
+
+    const safeCells = waterCount - maxMines;
+
+    res.json({
+      ok: true,
+      roomCode,
+      status: "flipping",
+      creatorName: "AI Commander",
+      waterMask,
+      revealedCells: [],
+      revealedValues: [], // Initially empty
+      antidotes: MAX_ANTIDOTES,
+      score: 0,
+      minesHit: 0,
+      safeCells,
+      totalMines: maxMines
+    });
+  } catch (err) {
+    console.error("create bot room error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ──────────── JOIN ROOM (Flipper) ────────────
 router.post("/rooms/:code/join", async (req, res) => {
   try {
