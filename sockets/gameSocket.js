@@ -39,6 +39,11 @@ module.exports = function registerSocketHandlers(io) {
       io.to(roomCode).emit("flip_update", { cellIndex, ...result });
     });
 
+    // Flipper joined
+    socket.on("flipper_joined", ({ roomCode, flipperName }) => {
+      io.to(roomCode).emit("flipper_joined", { roomCode, flipperName });
+    });
+
     // Game ended
     socket.on("game_ended", ({ roomCode, outcome }) => {
       io.to(roomCode).emit("game_result", { outcome });
